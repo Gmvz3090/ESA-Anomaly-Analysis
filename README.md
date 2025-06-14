@@ -145,18 +145,9 @@ Not at all. The pipeline works on CPU too (slower training, same accuracy).
 
 ## 📚 Citation
 
-If you refer to **ESA-ADB** in your work, please cite the following paper:
+The data trained on, and tested on is ESA-ADB, the data was processed using their repository.
 
 > Krzysztof Kotowski, Christoph Haskamp, Jacek Andrzejewski, Bogdan Ruszczak, Jakub Nalepa, Daniel Lakey, Peter Collins, Aybike Kolmas, Mauro Bartesaghi, Jose Martínez-Heras, and Gabriele De Canio.  
 > **European Space Agency Benchmark for Anomaly Detection in Satellite Telemetry.** arXiv, 2024.  
 > [https://doi.org/10.48550/arXiv.2406.17826](https://doi.org/10.48550/arXiv.2406.17826)
 
-```bibtex
-@article{kotowski_european_2024,
-  title = {European {Space} {Agency} {Benchmark} for {Anomaly} {Detection} in {Satellite} {Telemetry}},
-  author = {Kotowski, Krzysztof and Haskamp, Christoph and Andrzejewski, Jacek and Ruszczak, Bogdan and Nalepa, Jakub and Lakey, Daniel and Collins, Peter and Kolmas, Aybike and Bartesaghi, Mauro and Martinez-Heras, Jose and De Canio, Gabriele},
-  date = {2024},
-  publisher = {arXiv},
-  doi = {10.48550/arXiv.2406.17826}
-}
-```
