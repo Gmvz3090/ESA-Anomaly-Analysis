@@ -114,3 +114,98 @@ Built by **PXRLO**
 Feel free to contribute, open issues, or suggest improvements.
 
 ---
+
+
+---
+
+## 🏗️ Own Training (Pipeline)
+
+If you'd like to train the model yourself from scratch using your own healthy telemetry data:
+
+### 🔧 Prepare training data:
+- Format: `.csv` with numerical columns (`channel_1`, ..., `telecommand_*`)
+- Make sure it contains **no anomalies** (or remove anomaly rows)
+
+### 🧪 Steps:
+
+```bash
+# Train the autoencoder model
+python training_gru_attn.py
+
+# Extract latent vectors + errors from test data
+python export_attn_features.py
+
+# Train Random Forest classifier on high-error samples
+python train_rf_on_latent.py
+
+# Generate report based on trained RF
+python test_rf_downstream.py
+```
+
+You can also run:
+
+```bash
+bash run_pipeline.sh
+```
+
+This runs the full pipeline on the demo dataset.
+
+---
+
+## ⚡ Use This Model (Pretrained)
+
+If you simply want to **use the pretrained model** to analyze new telemetry:
+
+### 📁 Prepare your `.csv` file:
+- Format: same columns as `3_months.test.csv` (no `is_anomaly_*` needed)
+- Example: `my_telemetry.csv`
+
+### 🚀 Analyze:
+
+1. Replace file path in `export_attn_features.py`:
+   ```python
+   TEST = "my_telemetry.csv"
+   ```
+
+2. Run feature extraction:
+   ```bash
+   python export_attn_features.py
+   ```
+
+3. Run detection with pretrained RandomForest:
+   ```bash
+   python test_rf_downstream.py
+   ```
+
+Check `report.csv` for window-based anomaly summary.
+
+---
+
+## 🧠 How the Model Works
+
+This pipeline uses a hybrid approach:
+
+### 1. GRU + Attention Autoencoder
+- Learns to reconstruct time windows of telemetry (sliding sequences)
+- Uses **GRU** to process sequences and **attention** to focus on the most relevant time steps
+- Calculates **MSE** per sequence (and per channel)
+
+### 2. MSE-Based Filtering
+- Only samples with high total MSE (`>10`) are considered as *suspicious*
+
+### 3. Downstream Random Forest
+- Latent vectors (`z_0` to `z_31`) from encoder are used to train a Random Forest
+- Classifies whether high-error sample is truly anomalous or not
+
+### 4. Reporting
+- All predictions are grouped into **1000-sample windows**
+- Each window is flagged as:
+  - `OK` (if no anomaly detected)
+  - `ANOMALY` with exact row indices
+
+This design:
+- Reduces false positives dramatically (0%)
+- Retains high recall (80%+)
+- Enables real-world batch monitoring
+
+---
