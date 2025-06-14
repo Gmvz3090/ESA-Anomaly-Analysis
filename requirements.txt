@@ -1,0 +1,6 @@
+# requirements.txt
+numpy
+pandas
+scikit-learn
+torch>=2.0
+joblib
