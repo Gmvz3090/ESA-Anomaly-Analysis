@@ -1,151 +1,116 @@
-# 🚀 ESA-Analysis – Anomaly Detection with GRU + Attention + Downstream Classifier
+# 🚀 ESA-Anomaly-Analysis
 
-A complete anomaly detection pipeline for multivariate telemetry data using:
-- GRU-based Autoencoder with attention
-- RobustScaler preprocessing
-- MSE reconstruction error filtering
-- Random Forest classifier trained on latent vectors
-- Window-based anomaly reporting
+An advanced anomaly detection pipeline for multivariate satellite telemetry, using a GRU-based autoencoder with attention and a downstream Random Forest classifier.
 
 ---
 
-## 📂 Project Structure
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](https://www.python.org/)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-informational)]()
+[![Model](https://img.shields.io/badge/Model-GRU%20%2B%20Attention-green)]()
+[![Status](https://img.shields.io/badge/Status-Trained%20%26%20Ready-brightgreen)]()
+
+---
+
+## 📦 Overview
+
+This project provides a complete and ready-to-use anomaly detection solution for ESA-like satellite telemetry data. It combines:
+
+- GRU + Attention Autoencoder
+- MSE-based anomaly filtering
+- Random Forest trained on latent representations
+- Window-based anomaly reporting with high recall and 0% false positives
+
+---
+
+## 🧠 What’s Inside
+
+- ✅ Ready-trained model (80% recall, 0% false positives)
+- ✅ Easy retraining on your own data
+- ✅ Windowed anomaly reports in `report.csv`
+
+---
+
+## 📁 Folder Structure
 
 ```
-ESA-Analysis/
-├── 3_months.train.csv         # Training data (anomaly-free)
-├── 3_months.test.csv          # Test data (with labels)
+ESA-Anomaly-Analysis/
+├── 3_months.train.csv         # Training data (from MediaFire)
+├── 3_months.test.csv          # Testing data (from MediaFire)
 ├── attention_gru_autoencoder.py
-├── training_gru_attn.py       # Train GRU+Attention model
-├── export_attn_features.py    # Extract MSE + latent vectors
-├── train_rf_on_latent.py      # Train Random Forest
-├── test_rf_downstream.py      # Evaluate + report anomalies
-├── models/                    # Trained models and thresholds
-├── requirements.txt
-└── report.csv                 # Final output (window-based report)
+├── training_gru_attn.py
+├── export_attn_features.py
+├── train_rf_on_latent.py
+├── test_rf_downstream.py
+├── models/
+├── run_pipeline.sh
+├── README.md
+└── requirements.txt
 ```
 
 ---
 
-## 🛠️ Installation
+## 📥 Download Demo Dataset
+
+Test and training data used in this project:
+
+🔗 https://www.mediafire.com/file/t98hqv8nir414pe/DataRar.rar/file
+
+After downloading and extracting, make sure the following files are in the root directory:
+
+- `3_months.train.csv`
+- `3_months.test.csv`
+
+---
+
+## 🔄 Full Pipeline Usage
 
 ```bash
-git clone https://github.com/your-username/ESA-Analysis.git
-cd ESA-Analysis
-
+# Step 1: Create virtual environment
 python -m venv .venv
-source .venv/bin/activate      # or .venv\Scripts\activate on Windows
+source .venv/bin/activate
+
+# Step 2: Install requirements
 pip install -r requirements.txt
+
+# Step 3: Run the full pipeline
+bash run_pipeline.sh
 ```
 
----
-
-## 📊 How It Works
-
-### 1. Prepare the data
-Ensure the following files exist in the root:
-- `3_months.train.csv`: anomaly-free training data
-- `3_months.test.csv`: labeled test data with `is_anomaly_*` columns
-
----
-
-### 2. Train GRU + Attention Autoencoder
+Or run each step manually:
 
 ```bash
 python training_gru_attn.py
-```
-
-- Trains on sliding windows from healthy data
-- Saves model to `models/gru_attn.pt`
-- Computes 99th percentile MSE threshold
-
----
-
-### 3. Extract features from test set
-
-```bash
 python export_attn_features.py
-```
-
-- Extracts:
-  - Total MSE
-  - Per-channel MSE
-  - Latent vector `z_0`–`z_31`
-- Saves to `attn_features.csv`
-
----
-
-### 4. Train downstream classifier (RandomForest)
-
-```bash
 python train_rf_on_latent.py
-```
-
-- Uses only sequences with `mse_total > 10`
-- Trains RF to distinguish true vs. false positives
-- Saves to `models/rf_downstream.pkl`
-
----
-
-### 5. Generate final anomaly report
-
-```bash
 python test_rf_downstream.py
 ```
 
-- Classifies sequences with RF
-- Groups predictions into 1000-sample windows
-- Marks a window as:
-  - `OK` — if no anomalies detected
-  - `ANOMALY` — if any anomaly detected
-- Output: `report.csv` with per-window status
-
 ---
 
-## 📁 Example: `report.csv`
+## 📊 Output: `report.csv`
+
+Anomalies are reported in sliding windows of 1000 samples:
 
 ```
 range,status,indices
 0-999,OK,
-1000-1999,ANOMALY,1088,1123
+1000-1999,ANOMALY,1099,1123
 2000-2999,OK,
 ```
 
 ---
 
-## 🎯 Performance (example)
+## 📚 Source Datasets
 
-- Precision: **100%** (no false positives)
-- Recall: **80%** (846/852 anomalies detected)
-- Window-wise alerting for operational use
-
----
-
-## 📦 Dependencies
-
-```txt
-torch>=2.0
-numpy
-pandas
-scikit-learn
-joblib
-```
-
-Install with:
-
-```bash
-pip install -r requirements.txt
-```
+This project is based on:
+- 📡 [Zenodo: ESA Mission1](https://zenodo.org/records/12528696)
+- 🛠 [ESA-ADB preprocessing repo](https://github.com/kplabs-pl/ESA-ADB)
 
 ---
 
-## ✨ Credits
+## 👤 Author
 
-Built by [Your Name] for ESA-like anomaly detection challenges.  
-Trained and tested on multivariate telemetry with synthetic anomaly injection.
+Built by **PXRLO**  
+Feel free to contribute, open issues, or suggest improvements.
 
 ---
-
-## 📜 License
-
-MIT License
