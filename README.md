@@ -1,211 +1,141 @@
-# 🚀 ESA-Anomaly-Analysis
+# 🛰️ ESA Anomaly Analysis
 
-An advanced anomaly detection pipeline for multivariate satellite telemetry, using a GRU-based autoencoder with attention and a downstream Random Forest classifier.
-
----
-
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](https://www.python.org/)
-[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-informational)]()
-[![Model](https://img.shields.io/badge/Model-GRU%20%2B%20Attention-green)]()
-[![Status](https://img.shields.io/badge/Status-Trained%20%26%20Ready-brightgreen)]()
+A complete pipeline for **unsupervised anomaly detection** in satellite telemetry using:
+- GRU + Attention AutoEncoder (sequence reconstruction)
+- MSE-based anomaly scoring
+- Downstream Random Forest classifier (on latent vectors)
+- Windowed analysis + CSV reporting
 
 ---
 
-## 📦 Overview
+## 🔧 Quickstart (Zero-to-Result)
 
-This project provides a complete and ready-to-use anomaly detection solution for ESA-like satellite telemetry data. It combines:
-
-- GRU + Attention Autoencoder
-- MSE-based anomaly filtering
-- Random Forest trained on latent representations
-- Window-based anomaly reporting with high recall and 0% false positives
-
----
-
-## 🧠 What’s Inside
-
-- ✅ Ready-trained model (80% recall, 0% false positives)
-- ✅ Easy retraining on your own data
-- ✅ Windowed anomaly reports in `report.csv`
-
----
-
-## 📁 Folder Structure
-
-```
-ESA-Anomaly-Analysis/
-├── 3_months.train.csv         # Training data (from MediaFire)
-├── 3_months.test.csv          # Testing data (from MediaFire)
-├── attention_gru_autoencoder.py
-├── training_gru_attn.py
-├── export_attn_features.py
-├── train_rf_on_latent.py
-├── test_rf_downstream.py
-├── models/
-├── run_pipeline.sh
-├── README.md
-└── requirements.txt
-```
-
----
-
-## 📥 Download Demo Dataset
-
-Test and training data used in this project:
-
-🔗 https://www.mediafire.com/file/t98hqv8nir414pe/DataRar.rar/file
-
-After downloading and extracting, make sure the following files are in the root directory:
-
-- `3_months.train.csv`
-- `3_months.test.csv`
-
----
-
-## 🔄 Full Pipeline Usage
-
+1. **Clone the project**
 ```bash
-# Step 1: Create virtual environment
+git clone https://github.com/PXRLO/ESA-Anomaly-Analysis.git
+cd ESA-Anomaly-Analysis
+```
+
+2. **Download training/test data**  
+📦 From MediaFire:  
+https://www.mediafire.com/file/t98hqv8nir414pe/DataRar.rar/file
+
+Place `3_months.train.csv` and `3_months.test.csv` in the root of the project.
+
+3. **Create environment and install dependencies**
+```bash
 python -m venv .venv
-source .venv/bin/activate
-
-# Step 2: Install requirements
+source .venv/bin/activate       # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-
-# Step 3: Run the full pipeline
-bash run_pipeline.sh
 ```
 
-Or run each step manually:
-
+4. **Run the pipeline on the provided data**
 ```bash
-python training_gru_attn.py
-python export_attn_features.py
-python train_rf_on_latent.py
-python test_rf_downstream.py
+python training_gru_attn.py             # Train GRU+Attention AutoEncoder
+python export_attn_features.py          # Extract MSE + latent features
+python train_rf_on_latent.py            # Train downstream Random Forest
+python test_rf_downstream.py            # Generate report.csv
 ```
 
 ---
 
-## 📊 Output: `report.csv`
+## ⚠️ Important: When You Must Retrain RF
 
-Anomalies are reported in sliding windows of 1000 samples:
+> If you run `export_attn_features.py` on new data (even test data), you **must re-train the Random Forest classifier** using:
 
+```bash
+python train_rf_on_latent.py
 ```
+
+Otherwise, `test_rf_downstream.py` will fail to detect anomalies due to mismatch in feature distributions.
+
+---
+
+## 🧠 How It Works
+
+1. **GRU AutoEncoder + Attention**
+   - Learns to reconstruct 10-timestep windows of telemetry
+   - Computes MSE per channel and sequence
+   - Captures latent representation `z_0 ... z_31`
+
+2. **Anomaly Scoring**
+   - Only samples with MSE > 10.0 are flagged as "suspicious"
+
+3. **Downstream Classifier**
+   - Trained on `z_0 ... z_31` to detect true anomalies
+   - Uses Random Forest for robustness and precision
+
+4. **Windowed Reporting**
+   - Results grouped into 1000-row blocks
+   - Report in `report.csv`: shows which windows are anomalous
+
+---
+
+## 📦 File Overview
+
+| File                        | Purpose                                 |
+|-----------------------------|------------------------------------------|
+| `training_gru_attn.py`      | Train GRU + attention autoencoder       |
+| `export_attn_features.py`   | Generate latent vectors and MSE         |
+| `train_rf_on_latent.py`     | Train RandomForest on high-error data   |
+| `test_rf_downstream.py`     | Predict and generate final `report.csv` |
+| `attn_features.csv`         | Intermediate features for classification |
+| `models/*.pt / .pkl / .txt` | Saved PyTorch + RF + threshold           |
+
+---
+
+## ✅ Example Output: `report.csv`
+
+```csv
 range,status,indices
 0-999,OK,
-1000-1999,ANOMALY,1099,1123
-2000-2999,OK,
+1000-1999,ANOMALY,1103,1129,1171
+...
 ```
 
 ---
 
-## 📚 Source Datasets
+## 🧪 Evaluation Example
 
-This project is based on:
-- 📡 [Zenodo: ESA Mission1](https://zenodo.org/records/12528696)
-- 🛠 [ESA-ADB preprocessing repo](https://github.com/kplabs-pl/ESA-ADB)
+After testing, you'll see in the console:
 
----
+```
+✅ Report saved to: report.csv
 
-## 👤 Author
-
-Built by **PXRLO**  
-Feel free to contribute, open issues, or suggest improvements.
-
----
-
-
----
-
-## 🏗️ Own Training (Pipeline)
-
-If you'd like to train the model yourself from scratch using your own healthy telemetry data:
-
-### 🔧 Prepare training data:
-- Format: `.csv` with numerical columns (`channel_1`, ..., `telecommand_*`)
-- Make sure it contains **no anomalies** (or remove anomaly rows)
-
-### 🧪 Steps:
-
-```bash
-# Train the autoencoder model
-python training_gru_attn.py
-
-# Extract latent vectors + errors from test data
-python export_attn_features.py
-
-# Train Random Forest classifier on high-error samples
-python train_rf_on_latent.py
-
-# Generate report based on trained RF
-python test_rf_downstream.py
+📈 Evaluation:
+   ✅ True Positives: 683
+   ⚠️  False Positives: 0
+   ❌ False Negatives: 169
+   🎯 Precision: 1.000
+   📉 Recall:    0.802
+   🏆 F1-score:  0.890
 ```
 
-You can also run:
+---
 
-```bash
-bash run_pipeline.sh
-```
+## 🙋 FAQ
 
-This runs the full pipeline on the demo dataset.
+**Q: Can I use this model on my own telemetry data?**  
+✅ Yes! Just convert your data to `.csv` format with `channel_*` columns and follow the same steps.
+
+**Q: What if I don’t have `is_anomaly_*` columns?**  
+No problem — they are only used for evaluation. The model works without them.
+
+**Q: Is GPU required?**  
+Not at all. The pipeline works on CPU too (slower training, same accuracy).
 
 ---
 
-## ⚡ Use This Model (Pretrained)
+## 🏁 Summary
 
-If you simply want to **use the pretrained model** to analyze new telemetry:
-
-### 📁 Prepare your `.csv` file:
-- Format: same columns as `3_months.test.csv` (no `is_anomaly_*` needed)
-- Example: `my_telemetry.csv`
-
-### 🚀 Analyze:
-
-1. Replace file path in `export_attn_features.py`:
-   ```python
-   TEST = "my_telemetry.csv"
-   ```
-
-2. Run feature extraction:
-   ```bash
-   python export_attn_features.py
-   ```
-
-3. Run detection with pretrained RandomForest:
-   ```bash
-   python test_rf_downstream.py
-   ```
-
-Check `report.csv` for window-based anomaly summary.
+> 🎉 After training, this model achieves:
+> - **80%+ recall**
+> - **0% false positives**
+> - Fully windowed anomaly reports
+> - Easy to retrain or extend
 
 ---
 
-## 🧠 How the Model Works
-
-This pipeline uses a hybrid approach:
-
-### 1. GRU + Attention Autoencoder
-- Learns to reconstruct time windows of telemetry (sliding sequences)
-- Uses **GRU** to process sequences and **attention** to focus on the most relevant time steps
-- Calculates **MSE** per sequence (and per channel)
-
-### 2. MSE-Based Filtering
-- Only samples with high total MSE (`>10`) are considered as *suspicious*
-
-### 3. Downstream Random Forest
-- Latent vectors (`z_0` to `z_31`) from encoder are used to train a Random Forest
-- Classifies whether high-error sample is truly anomalous or not
-
-### 4. Reporting
-- All predictions are grouped into **1000-sample windows**
-- Each window is flagged as:
-  - `OK` (if no anomaly detected)
-  - `ANOMALY` with exact row indices
-
-This design:
-- Reduces false positives dramatically (0%)
-- Retains high recall (80%+)
-- Enables real-world batch monitoring
-
----
+**Author:** [PXRLO](https://github.com/PXRLO)  
+**License:** MIT  
+**Built with:** PyTorch, scikit-learn, pandas, NumPy  

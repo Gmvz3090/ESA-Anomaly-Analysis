@@ -21,31 +21,38 @@ Xs = sc.transform(X)
 seq = np.stack([Xs[i:i+WIN] for i in range(len(Xs)-WIN)])
 tensor = torch.tensor(seq).float().to(device)
 
-model = AttentionGRUAutoEncoder(X.shape[1], hidden_dim=64, latent_dim=LATENT)
+model = AttentionGRUAutoEncoder(X.shape[1], hidden_dim=64, latent_dim=LATENT).to(device)
 model.load_state_dict(torch.load(MODEL, map_location=device))
 model.eval()
 
-errors = []
-latents = []
+errors_total = []
+errors_per_channel = []
+latent_vectors = []
+
 with torch.no_grad():
     for batch in torch.split(tensor, 128):
+        batch = batch.to(device)
         out = model(batch)
         err = ((out - batch) ** 2).mean(dim=1)
-        errors.extend(err.mean(dim=1).cpu().numpy())
-        latents.extend(model.latent.weight.data.cpu().numpy())
+        errors_total.extend(err.mean(dim=1).cpu().numpy())
+        errors_per_channel.extend(err.cpu().numpy())
 
-errors = np.array(errors)
+        h, _ = model.encoder(batch)
+        h_mean = h.mean(dim=1)
+        z = model.latent(h_mean)
+        latent_vectors.extend(z.cpu().numpy())
+
 df_out = pd.DataFrame({
-    "idx": np.arange(len(errors)),
-    "mse_total": errors,
+    "idx": np.arange(len(errors_total)),
+    "mse_total": errors_total,
     "is_anomaly": labels
 })
 
 for i in range(X.shape[1]):
-    df_out[f"mse_{i}"] = err[:, i].cpu().numpy()
+    df_out[f"mse_{i}"] = [row[i] for row in errors_per_channel]
 
 for j in range(LATENT):
-    df_out[f"z_{j}"] = [z[j].item() for z in model.latent(model.encoder(tensor)[0].mean(dim=1))]
+    df_out[f"z_{j}"] = [z[j] for z in latent_vectors]
 
 df_out.to_csv("attn_features.csv", index=False)
 print("✅ Saved to attn_features.csv")
