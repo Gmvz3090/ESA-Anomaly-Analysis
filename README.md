@@ -111,17 +111,6 @@ After testing, you'll see in the console:
    🏆 F1-score:  {F1_Score}
 ```
 
----
-
-## 🙋 FAQ
-
-**Q: Can I use this model on my own telemetry data?**  
-✅ Yes! Just convert your data to `.csv` format with `channel_*` columns and follow the same steps.
-
-**Q: What if I don’t have `is_anomaly_*` columns?**  
-No problem — they are only used for evaluation. The model works without them.
-
----
 
 ## 🏁 Summary
 
