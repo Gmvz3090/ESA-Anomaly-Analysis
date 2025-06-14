@@ -103,12 +103,12 @@ After testing, you'll see in the console:
 ✅ Report saved to: report.csv
 
 📈 Evaluation:
-   ✅ True Positives: 683
-   ⚠️  False Positives: 0
-   ❌ False Negatives: 169
-   🎯 Precision: 1.000
-   📉 Recall:    0.802
-   🏆 F1-score:  0.890
+   ✅ True Positives: {TP}
+   ⚠️  False Positives: {FP}
+   ❌ False Negatives: {FN}
+   🎯 Precision: {Precision}
+   📉 Recall:    {Recall}
+   🏆 F1-score:  {F1_Score}
 ```
 
 ---
@@ -120,9 +120,6 @@ After testing, you'll see in the console:
 
 **Q: What if I don’t have `is_anomaly_*` columns?**  
 No problem — they are only used for evaluation. The model works without them.
-
-**Q: Is GPU required?**  
-Not at all. The pipeline works on CPU too (slower training, same accuracy).
 
 ---
 
@@ -138,8 +135,6 @@ Not at all. The pipeline works on CPU too (slower training, same accuracy).
 
 **Author:** [PXRLO](https://github.com/PXRLO)  
 **License:** MIT  
-**Built with:** PyTorch, scikit-learn, pandas, NumPy  
-
 
 ---
 
