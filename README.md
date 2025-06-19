@@ -43,7 +43,6 @@ ESA-Anomaly-Analysis/
 ├── export_attn_features.py         # Feature extraction pipeline
 ├── train_rf_on_latent.py          # Stage 2: Train Random Forest classifier
 ├── test_rf_downstream.py          # Comprehensive evaluation
-├── deploy_anomaly_detector.py     # Production deployment script
 ├── requirements.txt               # Python dependencies
 └── README.md                     # This file
 ```
@@ -93,17 +92,6 @@ python train_rf_on_latent.py
 python test_rf_downstream.py
 ```
 
-### Production Deployment
-```bash
-# High sensitivity (critical mission phases)
-python deploy_anomaly_detector.py --mode low
-
-# Balanced operation (recommended default)
-python deploy_anomaly_detector.py --mode medium
-
-# High precision (routine operations)
-python deploy_anomaly_detector.py --mode high
-```
 
 ## 📈 Model Details
 
@@ -124,36 +112,6 @@ python deploy_anomaly_detector.py --mode high
 - **Preprocessing**: RobustScaler normalization, temporal sequence preservation
 - **Split Strategy**: Stratified sampling ensuring anomalies in test set
 
-## 🎯 Usage Examples
-
-### Real-time Monitoring
-```python
-from deploy_anomaly_detector import AnomalyDetector
-
-# Initialize detector in balanced mode
-detector = AnomalyDetector(mode="medium")
-
-# Process telemetry window (10 timesteps × 87 channels)
-features = extract_features(telemetry_window)
-predictions, probabilities = detector.predict(features)
-
-# Generate alert if anomaly detected
-if predictions[0] == 1:
-    alert = detector.generate_alert(sequence_id, probabilities[0], features)
-    print(f"🚨 ANOMALY DETECTED: {alert}")
-```
-
-### Batch Analysis
-```python
-# Load test data
-features = pd.read_csv("attn_features.csv")
-
-# Evaluate different sensitivity modes
-for mode in ["low", "medium", "high"]:
-    detector = AnomalyDetector(mode=mode)
-    predictions, _ = detector.predict(features)
-    evaluate_performance(predictions, ground_truth)
-```
 
 ## 📊 Evaluation Metrics
 
@@ -171,24 +129,10 @@ for mode in ["low", "medium", "high"]:
 
 ## 🔬 Technical Improvements
 
-### Compared to Baseline
-The original threshold-based approach achieved:
-- ❌ **0.3% precision** (997 false alarms per 1000 alerts)
-- ❌ **99.67% false positive rate** (system unusable)
-- ❌ **Hard-coded threshold** (no adaptability)
-
-Our enhanced pipeline achieves:
 - ✅ **34-66% precision** (manageable false alarm rate)
 - ✅ **91-99% recall** (high anomaly detection rate)
 - ✅ **Configurable sensitivity** (operational flexibility)
-- ✅ **Feature-rich detection** (56 vs 1 features)
-
-### Key Technical Innovations
-1. **Proper AutoEncoder Architecture**: Fixed teacher forcing and attention mechanism
-2. **Adaptive Thresholding**: Data-driven threshold calculation vs hard-coded values
-3. **Feature Engineering**: Multi-modal features from reconstruction, latent space, and attention
-4. **Temporal Preservation**: No data shuffling to maintain satellite telemetry structure
-5. **Production Flexibility**: Multiple operational modes for different mission phases
+- ✅ **Feature-rich detection** (56 features)
 
 ## 📚 Dataset Information
 
@@ -222,8 +166,6 @@ python train_rf_on_latent.py
 # Comprehensive evaluation
 python test_rf_downstream.py
 
-# Test deployment modes
-python deploy_anomaly_detector.py --mode medium
 ```
 
 ### Model Artifacts
@@ -274,13 +216,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **TimeEval Framework** for evaluation pipeline inspiration
 - **PyTorch Community** for deep learning tools and documentation
 
-## 📞 Contact
 
-For questions about this implementation or collaboration opportunities:
-
-- **GitHub Issues**: [Create an issue](https://github.com/Gmvz3090/ESA-Anomaly-Analysis/issues)
-- **Email**: [Your email if you want to include it]
-
----
-
-**Built for mission-critical satellite operations • Tested on real ESA data • Production-ready deployment**
+**Built for mission-critical satellite operations • Tested on real ESA data**
