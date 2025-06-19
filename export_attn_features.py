@@ -1,219 +1,123 @@
-import torch
 import pandas as pd
-import numpy as np
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.metrics import classification_report, f1_score
 import joblib
-from torch.utils.data import DataLoader, TensorDataset
-from attention_gru_autoencoder import AttentionGRUAutoEncoder
+import numpy as np
 
+print("🌲 TRAINING RANDOM FOREST (FIXED VERSION)...")
 
-TEST = "3_months.test.csv"
-SCALER = "models/rs_scaler.pkl"
-MODEL = "models/gru_attn_best.pt"
-THRESHOLD_FILE = "models/gru_attn_thr.txt"
-WIN = 10
-HIDDEN, LATENT = 64, 32
-BATCH_SIZE = 128
+features = pd.read_csv("attn_features.csv")
+print(f"📊 Total samples: {len(features)}")
+print(f"📊 Anomalies: {features['is_anomaly'].sum()} ({features['is_anomaly'].mean()*100:.2f}%)")
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {device}")
+print("✅ Using ALL data (no arbitrary filtering)")
 
+latent_cols = [f"latent_{i}" for i in range(32)]  
+mse_cols = [col for col in features.columns if col.startswith('mse_channel_')][:20]  # Top 20
+attention_cols = ['attention_max', 'attention_std', 'attention_entropy']
 
-print("Loading test data...")
-df = pd.read_csv(TEST)
-print(f"Test data shape: {df.shape}")
+selected_features = ['mse_total'] + mse_cols + latent_cols + attention_cols
+selected_features = [col for col in selected_features if col in features.columns]
 
+print(f"📋 Selected {len(selected_features)} features:")
+print(f"   - MSE features: {len([f for f in selected_features if 'mse' in f])}")
+print(f"   - Latent features: {len(latent_cols)}")
+print(f"   - Attention features: {len([f for f in selected_features if 'attention' in f])}")
 
-anom = [c for c in df.columns if c.startswith("is_anomaly_")]
-print(f"Found {len(anom)} anomaly columns")
+X = features[selected_features]
+y = features["is_anomaly"]
 
+print(f"🔍 Feature matrix shape: {X.shape}")
+print(f"🔍 Target distribution: Normal={np.sum(y==0)}, Anomaly={np.sum(y==1)}")
 
-all_labels = (df[anom].sum(axis=1) > 0).astype(int).values
-print(f"Total anomalies in test data: {all_labels.sum()} ({all_labels.mean()*100:.2f}%)")
+print("🔄 Creating stratified train/test split...")
+sss = StratifiedShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+train_idx, test_idx = next(sss.split(X, y))
 
+X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
 
-X_all = df.drop(columns=["timestamp"] + anom, errors="ignore").values
-print(f"Full feature matrix shape: {X_all.shape}")
+print(f"📊 Train: {len(X_train)} samples, {y_train.sum()} anomalies ({y_train.mean()*100:.2f}%)")
+print(f"📊 Test: {len(X_test)} samples, {y_test.sum()} anomalies ({y_test.mean()*100:.2f}%)")
 
-
-print("Creating sequences...")
-sequences = np.stack([X_all[i:i+WIN] for i in range(len(X_all)-WIN)])
-labels = all_labels[WIN:]  
-
-print(f"Sequences shape: {sequences.shape}")
-print(f"Labels shape: {labels.shape}")
-print(f"Anomalies in sequence labels: {labels.sum()} ({labels.mean()*100:.2f}%)")
-
-
-print("\n🔧 APPLYING SCALING TO ALL DATA...")
-sc = joblib.load(SCALER)
-
-
-seq_reshaped = sequences.reshape(-1, sequences.shape[-1])
-seq_scaled_reshaped = sc.transform(seq_reshaped)
-seq_scaled = seq_scaled_reshaped.reshape(sequences.shape)
-
-print(f"Scaled sequence range: [{seq_scaled.min():.3f}, {seq_scaled.max():.3f}]")
-print(f"Scaled sequence mean: {seq_scaled.mean():.3f}, std: {seq_scaled.std():.3f}")
-
-
-print("Loading threshold...")
-with open(THRESHOLD_FILE, 'r') as f:
-    original_threshold = float(f.read().strip())
-print(f"Original threshold: {original_threshold:.6f}")
-
-
-print("Loading model...")
-model = AttentionGRUAutoEncoder(X_all.shape[1], hidden_dim=HIDDEN, latent_dim=LATENT).to(device)
-model.load_state_dict(torch.load(MODEL, map_location=device))
-model.eval()
-
-
-print("\n🧪 TESTING MODEL SCALE...")
-test_sample = torch.tensor(seq_scaled[:100]).float().to(device)
-with torch.no_grad():
-    test_output = model(test_sample)
-    test_mse = ((test_output - test_sample) ** 2).mean(dim=(1,2))
-    print(f"Sample MSE range: [{test_mse.min():.6f}, {test_mse.max():.6f}]")
-    print(f"Sample MSE mean: {test_mse.mean():.6f}")
-
-
-
-mse_scale_factor = test_mse.mean().item() / original_threshold
-print(f"MSE scale factor: {mse_scale_factor:.2f}")
-
-if mse_scale_factor > 10 or mse_scale_factor < 0.1:
-    print("🚨 Large scale difference detected - adjusting threshold...")
+# Check if we have anomalies in test
+if y_test.sum() == 0:
+    print("⚠️ No anomalies in test set - using manual split...")
+    # Manual approach
+    anomaly_indices = np.where(y == 1)[0]
+    normal_indices = np.where(y == 0)[0]
     
-    adjusted_threshold = np.percentile(test_mse.cpu().numpy(), 95)
-    print(f"Adjusted threshold (95th percentile): {adjusted_threshold:.6f}")
-    threshold = adjusted_threshold
-else:
-    threshold = original_threshold
-    print(f"Using original threshold: {threshold:.6f}")
+    # Take 20% of anomalies for test
+    n_test_anomalies = max(1, len(anomaly_indices) // 5)
+    test_anomaly_idx = np.random.choice(anomaly_indices, n_test_anomalies, replace=False)
+    
+    # Take 20% of normal samples for test
+    n_test_normal = len(normal_indices) // 5
+    test_normal_idx = np.random.choice(normal_indices, n_test_normal, replace=False)
+    
+    test_idx = np.concatenate([test_anomaly_idx, test_normal_idx])
+    train_idx = np.setdiff1d(np.arange(len(X)), test_idx)
+    
+    X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+    y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+    
+    print(f"📊 Manual split - Train: {len(X_train)} samples, {y_train.sum()} anomalies")
+    print(f"📊 Manual split - Test: {len(X_test)} samples, {y_test.sum()} anomalies")
 
-
-test_loader = DataLoader(
-    TensorDataset(torch.tensor(seq_scaled).float()), 
-    batch_size=BATCH_SIZE, 
-    shuffle=False
+# Train Random Forest
+print("🌲 Training Random Forest...")
+clf = RandomForestClassifier(
+    n_estimators=200,  
+    max_depth=10,    
+    class_weight="balanced", 
+    random_state=42,
+    n_jobs=-1
 )
 
+clf.fit(X_train, y_train)
+print("✅ Training completed!")
 
-print("\nExtracting features...")
-errors_total = []
-errors_per_channel = []
-latent_vectors = []
-attention_weights = []
+# Evaluation
+print("\n📊 EVALUATION:")
 
-with torch.no_grad():
-    for batch_idx, (batch,) in enumerate(test_loader):
-        batch = batch.to(device)
-        
-        
-        output = model(batch)
-        
-        
-        mse_per_sample_channel = ((output - batch) ** 2).mean(dim=1)  
-        mse_per_sample = mse_per_sample_channel.mean(dim=1)  
-        
-        errors_total.extend(mse_per_sample.cpu().numpy())
-        errors_per_channel.extend(mse_per_sample_channel.cpu().numpy())
-        
-        
-        latent, attn_weights = model.get_latent_representation(batch)
-        latent_vectors.extend(latent)
-        attention_weights.extend(attn_weights)
-        
-        if (batch_idx + 1) % 50 == 0:
-            print(f"  Processed {(batch_idx + 1) * BATCH_SIZE} sequences...")
+# Training performance
+train_pred = clf.predict(X_train)
+train_f1 = f1_score(y_train, train_pred)
+print(f"🎯 Training F1: {train_f1:.3f}")
 
+# Test performance
+test_pred = clf.predict(X_test)
+test_f1 = f1_score(y_test, test_pred)
+print(f"🎯 Test F1: {test_f1:.3f}")
 
-errors_total = np.array(errors_total)
-attention_weights = np.array(attention_weights)
+print(f"\n📈 DETAILED TEST RESULTS:")
+print(classification_report(y_test, test_pred))
 
-print(f"Extracted features for {len(errors_total)} sequences")
+# Feature importance
+print(f"\n🏆 TOP 10 MOST IMPORTANT FEATURES:")
+feature_importance = list(zip(selected_features, clf.feature_importances_))
+feature_importance.sort(key=lambda x: x[1], reverse=True)
 
+for i, (feat, importance) in enumerate(feature_importance[:10]):
+    feature_type = "MSE" if feat.startswith('mse') else "LATENT" if feat.startswith('latent') else "ATTENTION"
+    print(f"{i+1:2d}. {feat:20s} ({feature_type:9s}): {importance:.4f}")
 
-print("Creating feature dataframe...")
+# Save model
+joblib.dump(clf, "models/rf_downstream.pkl")
 
+# Also save feature names for later use
+with open("models/rf_features.txt", "w") as f:
+    for feat in selected_features:
+        f.write(feat + "\n")
 
-base_features = pd.DataFrame({
-    "idx": np.arange(len(errors_total)),
-    "mse_total": errors_total,
-    "is_anomaly": labels,
-    "is_high_error": (errors_total > threshold).astype(int)
-})
+print(f"\n💾 SAVED:")
+print(f"✅ Model: models/rf_downstream.pkl")
+print(f"✅ Features: models/rf_features.txt")
 
+# Summary
+print(f"\n🎉 SUMMARY:")
+print(f"📊 Features used: {len(selected_features)}")
+print(f"🎯 Test F1 Score: {test_f1:.3f}")
+print(f"🏆 Best feature type: {feature_importance[0][0]}")
 
-mse_channel_df = pd.DataFrame(
-    errors_per_channel,
-    columns=[f"mse_channel_{i}" for i in range(X_all.shape[1])]
-)
-
-
-latent_df = pd.DataFrame(
-    latent_vectors,
-    columns=[f"latent_{i}" for i in range(LATENT)]
-)
-
-
-attention_stats_df = pd.DataFrame({
-    'attention_max': attention_weights.max(axis=1),
-    'attention_min': attention_weights.min(axis=1),
-    'attention_std': attention_weights.std(axis=1),
-    'attention_entropy': -np.sum(attention_weights * np.log(attention_weights + 1e-8), axis=1)
-})
-
-attention_timestep_df = pd.DataFrame(
-    attention_weights,
-    columns=[f'attention_t{t}' for t in range(WIN)]
-)
-
-
-df_out = pd.concat([
-    base_features,
-    mse_channel_df,
-    latent_df,
-    attention_stats_df,
-    attention_timestep_df
-], axis=1)
-
-
-
-normal_mse = df_out[df_out['is_anomaly'] == 0]['mse_total']
-anomaly_mse = df_out[df_out['is_anomaly'] == 1]['mse_total']
-
-
-if len(anomaly_mse) > 0 and len(normal_mse) > 0:
-    separation_ratio = anomaly_mse.mean() / normal_mse.mean()
-    print(f"Separation ratio: {separation_ratio:.2f}x")
-    
-    if separation_ratio > 1.0:
-        print("✅ Anomalies have higher MSE - CORRECT!")
-    else:
-        print("❌ Anomalies have lower MSE - STILL PROBLEMATIC!")
-
-
-if df_out['is_high_error'].sum() > 0:
-    preliminary_precision = df_out[df_out['is_high_error'] == 1]['is_anomaly'].mean()
-    preliminary_recall = df_out[df_out['is_anomaly'] == 1]['is_high_error'].mean()
-    
-    print(f"\n🎯 PRELIMINARY MSE-BASED DETECTION:")
-    print(f"Precision: {preliminary_precision:.3f}")
-    print(f"Recall: {preliminary_recall:.3f}")
-    
-    if preliminary_precision > 0 and preliminary_recall > 0:
-        preliminary_f1 = 2 * (preliminary_precision * preliminary_recall) / (preliminary_precision + preliminary_recall)
-        print(f"F1-Score: {preliminary_f1:.3f}")
-else:
-    print(f"\n⚠️ No samples flagged as high error with current threshold")
-
-print(f"\n📊 FEATURE EXTRACTION SUMMARY:")
-print(f"Total sequences: {len(df_out)}")
-print(f"True anomalies: {df_out['is_anomaly'].sum()} ({df_out['is_anomaly'].mean()*100:.2f}%)")
-print(f"High error samples (MSE > threshold): {df_out['is_high_error'].sum()} ({df_out['is_high_error'].mean()*100:.2f}%)")
-
-
-output_file = "attn_features.csv"
-df_out.to_csv(output_file, index=False)
-print(f"\n✅ Features saved to: {output_file}")
