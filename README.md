@@ -212,9 +212,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - **ESA (European Space Agency)** for providing the first public satellite anomaly dataset
-- **KP Labs** and **Airbus Defence and Space** for dataset curation and expert annotations
-- **TimeEval Framework** for evaluation pipeline inspiration
-- **PyTorch Community** for deep learning tools and documentation
-
 
 **Built for mission-critical satellite operations • Tested on real ESA data**
