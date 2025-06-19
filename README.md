@@ -8,9 +8,6 @@ A production-ready machine learning pipeline for detecting anomalies in satellit
 
 ## 🚀 Key Features
 
-- **115x improved precision** over baseline threshold-based methods
-- **Production-ready deployment** with configurable sensitivity modes
-- **Real satellite data** from ESA's first public anomaly dataset
 - **Attention-based feature extraction** from 87 telemetry channels
 - **Multi-tier alerting system** (LOW/MEDIUM/HIGH sensitivity modes)
 - **Comprehensive evaluation** with satellite-operations-specific metrics
