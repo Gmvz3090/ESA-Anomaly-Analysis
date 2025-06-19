@@ -19,7 +19,6 @@ A production-ready machine learning pipeline for detecting anomalies in satellit
 | **Precision** | 34.5% | 47.0% | 65.5% |
 | **Recall** | 98.8% | 91.2% | 64.7% |
 | **False Alarm Rate** | 62% | 34% | 11% |
-| **Use Case** | Critical phases | Standard ops | Routine ops |
 
 *Tested on 170 real satellite anomalies from ESA Mission1 data*
 
