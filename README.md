@@ -89,7 +89,7 @@ python export_attn_features.py
 python train_rf_on_latent.py
 
 # 4. Evaluate and generate report
-python test_rf_downstream.py
+python test_rf_downstream.py --mode {high/medium/low}
 ```
 
 
