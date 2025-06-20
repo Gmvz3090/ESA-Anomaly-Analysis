@@ -7,17 +7,15 @@ import argparse
 
 print("🎯 ESA Anomaly Detection - Final Testing...")
 
-# Parse arguments for mode selection
 parser = argparse.ArgumentParser(description="Test Random Forest with different modes")
 parser.add_argument("--mode", choices=["low", "medium", "high"], default="medium",
                    help="Detection sensitivity mode")
 args = parser.parse_args()
 
-# Define thresholds for each mode
 thresholds = {
-    "low": 0.5,     # High recall, more false alarms
-    "medium": 0.8,  # Balanced 
-    "high": 0.95    # High precision, conservative
+    "low": 0.5,     
+    "medium": 0.8, 
+    "high": 0.95   
 }
 
 threshold = thresholds[args.mode]
@@ -56,7 +54,6 @@ if missing_features:
     print("Available features:", list(features.columns))
     exit(1)
 
-# Prepare test data (use same split as training)
 X = features[selected_features]
 y = features["is_anomaly"]
 
