@@ -11,46 +11,42 @@ import argparse
 def save_detailed_results(features, predictions, probabilities, y_true, y_pred, 
                          test_indices, mode, threshold, output_dir="results"):
     """
-    Zapisuje szczegółowe wyniki analizy w formacie JSON z per-timestamp analysis
+    Zapisuje tylko wykryte anomalie w prostym formacie JSON
     """
     Path(output_dir).mkdir(exist_ok=True)
     
-    # Prepare detailed results
-    detailed_results = []
+    detected_anomalies = []
     
     for i, idx in enumerate(test_indices):
-        original_idx = features.index[idx]  # Original index from dataset
-        
-        result = {
-            "timestamp_id": int(original_idx),
-            "sequence_index": int(idx),
-            "prediction": {
-                "status": "ANOMALY" if y_pred[i] == 1 else "NORMAL",
-                "confidence": float(probabilities[i]),
-                "threshold_used": float(threshold),
-                "binary_prediction": int(y_pred[i])
-            },
-            "ground_truth": {
-                "is_anomaly": bool(y_true.iloc[i]),
-                "label": int(y_true.iloc[i])
-            },
-            "classification": {
-                "correct": bool(y_pred[i] == y_true.iloc[i]),
-                "type": get_classification_type(y_true.iloc[i], y_pred[i])
-            },
-            "risk_assessment": get_risk_level(probabilities[i], threshold),
-            "features_summary": {
-                "mse_reconstruction": float(features.loc[original_idx, "mse_reconstruction"]) 
-                    if "mse_reconstruction" in features.columns else None,
-                "attention_max": float(features.loc[original_idx, "attention_max"]) 
-                    if "attention_max" in features.columns else None,
-                "attention_std": float(features.loc[original_idx, "attention_std"]) 
-                    if "attention_std" in features.columns else None
-            }
-        }
-        detailed_results.append(result)
+        if y_pred[i] == 1: 
+            timestamp_id = test_indices[i] 
+            
+            detected_anomalies.append({
+                "timestamp_id": int(timestamp_id),
+                "is_detected_anomaly": True,
+                "confidence": float(probabilities[i])
+            })
     
-    # Summary statistics
+    detected_anomalies.sort(key=lambda x: x["timestamp_id"])
+    
+    anomaly_report = {
+        "metadata": {
+            "timestamp": datetime.now().isoformat(),
+            "mode": mode,
+            "threshold": float(threshold),
+            "total_detected_anomalies": len(detected_anomalies)
+        },
+        "detected_anomalies": detected_anomalies
+    }
+    
+    # Zapisz plik z wykrytymi anomaliami
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    anomaly_file = f"{output_dir}/detected_anomalies_{mode}_{timestamp}.json"
+    
+    with open(anomaly_file, 'w', encoding='utf-8') as f:
+        json.dump(anomaly_report, f, indent=2, ensure_ascii=False)
+    
+    # Zachowaj summary z metrykami (dla Ciebie)
     tp = np.sum((y_true == 1) & (y_pred == 1))
     fp = np.sum((y_true == 0) & (y_pred == 1))
     fn = np.sum((y_true == 1) & (y_pred == 0))
@@ -58,84 +54,23 @@ def save_detailed_results(features, predictions, probabilities, y_true, y_pred,
     
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0
-    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
     
-    # Create comprehensive report
-    report = {
-        "metadata": {
-            "timestamp": datetime.now().isoformat(),
-            "mode": mode,
-            "threshold": float(threshold),
-            "total_test_samples": len(y_pred),
-            "model_file": "models/rf_downstream.pkl",
-            "feature_count": len(features.columns) - 1  # excluding is_anomaly
-        },
-        "summary_metrics": {
-            "confusion_matrix": {
-                "true_negatives": int(tn),
-                "false_positives": int(fp),
-                "false_negatives": int(fn),
-                "true_positives": int(tp)
-            },
-            "performance": {
-                "precision": float(precision),
-                "recall": float(recall),
-                "f1_score": float(f1),
-                "specificity": float(specificity),
-                "accuracy": float((tp + tn) / len(y_pred)),
-                "false_alarm_rate": float(fp / len(y_pred)),
-                "detection_rate": float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0
-            },
-            "operational": {
-                "alerts_per_1000_periods": float((tp + fp) / len(y_pred) * 1000),
-                "missed_anomalies": int(fn),
-                "total_anomalies": int(y_true.sum()),
-                "anomaly_detection_percentage": float(tp / y_true.sum() * 100) if y_true.sum() > 0 else 0.0
-            }
-        },
-        "anomaly_analysis": {
-            "detected_anomalies": int(tp),
-            "missed_anomalies": int(fn),
-            "false_alarms": int(fp),
-            "anomaly_timestamps": [int(features.index[test_indices[i]]) 
-                                 for i in range(len(y_pred)) 
-                                 if y_true.iloc[i] == 1 and y_pred[i] == 1],
-            "missed_anomaly_timestamps": [int(features.index[test_indices[i]]) 
-                                        for i in range(len(y_pred)) 
-                                        if y_true.iloc[i] == 1 and y_pred[i] == 0],
-            "false_alarm_timestamps": [int(features.index[test_indices[i]]) 
-                                     for i in range(len(y_pred)) 
-                                     if y_true.iloc[i] == 0 and y_pred[i] == 1]
-        },
-        "detailed_predictions": detailed_results
-    }
-    
-    # Save main report
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_file = f"{output_dir}/anomaly_detection_report_{mode}_{timestamp}.json"
-    
-    with open(report_file, 'w', encoding='utf-8') as f:
-        json.dump(report, f, indent=2, ensure_ascii=False)
-    
-    # Save compact summary for quick access
     summary_file = f"{output_dir}/summary_{mode}_{timestamp}.json"
     summary = {
         "mode": mode,
         "threshold": float(threshold),
-        "performance": report["summary_metrics"]["performance"],
-        "anomaly_count": {
-            "detected": int(tp),
-            "missed": int(fn),
-            "false_alarms": int(fp)
-        },
-        "recommendation": get_mode_recommendation(precision, recall, fp, len(y_pred))
+        "performance": {
+            "precision": float(precision),
+            "recall": float(recall),
+            "detected_anomalies": int(tp + fp),  
+            "true_anomalies_in_data": int(tp + fn)  
+        }
     }
     
     with open(summary_file, 'w', encoding='utf-8') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
     
-    return report_file, summary_file
+    return anomaly_file, summary_file
 
 def get_classification_type(true_label, pred_label):
     """Określa typ klasyfikacji"""
@@ -174,33 +109,23 @@ def get_mode_recommendation(precision, recall, false_positives, total_samples):
     else:
         return "Current mode performance acceptable"
 
-def print_enhanced_analysis(report, mode):
+def print_enhanced_analysis(summary_data, detected_timestamps, mode):
     """Wyświetla rozszerzoną analizę wyników"""
     print(f"\n🎯 ENHANCED ANALYSIS ({mode.upper()} MODE):")
     print("=" * 70)
     
-    perf = report["summary_metrics"]["performance"]
-    anom = report["anomaly_analysis"]
+    perf = summary_data["performance"]
     
     print(f"📊 DETECTION EFFECTIVENESS:")
-    print(f"   • Anomalies caught:     {anom['detected_anomalies']:3d} / {anom['detected_anomalies'] + anom['missed_anomalies']:3d} ({perf['recall']*100:.1f}%)")
-    print(f"   • False alarms:         {anom['false_alarms']:3d} ({perf['false_alarm_rate']*100:.2f}% of data)")
+    print(f"   • Anomalies detected:   {perf['detected_anomalies']:3d}")
     print(f"   • Alert reliability:    {perf['precision']*100:.1f}%")
+    print(f"   • Coverage:             {perf['recall']*100:.1f}%")
     
-    print(f"\n🛰️ OPERATIONAL IMPACT:")
-    op = report["summary_metrics"]["operational"]
-    print(f"   • Alert frequency:      {op['alerts_per_1000_periods']:.1f} per 1000 periods")
-    print(f"   • Missed critical:      {op['missed_anomalies']} anomalies")
-    print(f"   • Detection coverage:   {op['anomaly_detection_percentage']:.1f}%")
-    
-    # Top risk timestamps
-    detailed = report["detailed_predictions"]
-    high_risk = [p for p in detailed if p["risk_assessment"] in ["CRITICAL", "HIGH"]]
-    if high_risk:
-        print(f"\n⚠️ HIGH RISK PERIODS ({len(high_risk)} total):")
-        for pred in sorted(high_risk, key=lambda x: x["prediction"]["confidence"], reverse=True)[:5]:
-            status = "✓" if pred["classification"]["correct"] else "✗"
-            print(f"   {status} Timestamp {pred['timestamp_id']:6d}: {pred['prediction']['confidence']:.3f} ({pred['risk_assessment']})")
+    if detected_timestamps:
+        print(f"\n📋 DETECTED ANOMALY TIMESTAMPS:")
+        print(f"   • First detected: {min(detected_timestamps)}")
+        print(f"   • Last detected:  {max(detected_timestamps)}")
+        print(f"   • Sample IDs:     {detected_timestamps[:5]}{'...' if len(detected_timestamps) > 5 else ''}")
 
 # Main execution
 print("🎯 ESA Anomaly Detection - Enhanced Final Testing...")
@@ -333,18 +258,30 @@ try:
     if args.save_results:
         print(f"\n💾 Saving detailed results...")
         try:
-            report_file, summary_file = save_detailed_results(
+            anomaly_file, summary_file = save_detailed_results(
                 features, y_pred, y_pred_proba, y_test, y_pred, 
                 test_idx, args.mode, threshold, args.output_dir
             )
-            print(f"✅ Detailed report saved: {report_file}")
+            print(f"✅ Anomaly detections saved: {anomaly_file}")
             print(f"✅ Summary saved: {summary_file}")
             
             # Load and display enhanced analysis
-            with open(report_file, 'r', encoding='utf-8') as f:
-                report = json.load(f)
+            with open(summary_file, 'r', encoding='utf-8') as f:
+                summary_data = json.load(f)
             
-            print_enhanced_analysis(report, args.mode)
+            with open(anomaly_file, 'r', encoding='utf-8') as f:
+                anomaly_data = json.load(f)
+                detected_timestamps = [a["timestamp_id"] for a in anomaly_data["detected_anomalies"]]
+            
+            print(f"\n📋 Wykryte anomalie (weryfikacja sortowania):")
+            if detected_timestamps:
+                print(f"   • Pierwsze 5: {detected_timestamps[:5]}")
+                print(f"   • Ostatnie 5: {detected_timestamps[-5:]}")
+                print(f"   • Czy posortowane: {detected_timestamps == sorted(detected_timestamps)}")
+            else:
+                print("   • Brak wykrytych anomalii")
+            
+            print_enhanced_analysis(summary_data, detected_timestamps, args.mode)
             
         except Exception as e:
             print(f"❌ Failed to save detailed results: {e}")
