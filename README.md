@@ -1,6 +1,6 @@
 # ESA Satellite Telemetry Anomaly Detection
 
-A production-ready machine learning pipeline for detecting anomalies in satellite telemetry data using the official ESA Anomaly Dataset. This system combines a GRU-based AutoEncoder with attention mechanisms and Random Forest classification to achieve industry-standard performance for mission-critical satellite operations.
+A machine learning pipeline for detecting anomalies in satellite telemetry data using the official ESA Anomaly Dataset. This system combines a GRU-based AutoEncoder with attention mechanisms and Random Forest classification to achieve industry-standard performance for mission-critical satellite operations.
 
 ![Python](https://img.shields.io/badge/python-v3.8+-blue.svg)
 ![PyTorch](https://img.shields.io/badge/PyTorch-v1.12+-red.svg)
